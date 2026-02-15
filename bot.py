@@ -16,7 +16,7 @@ from buttons.home import get_home
 from config import *
 from functions.user_exists import user_exists, username_exists
 from buttons.send_contact import send_contact
-from functions.user_data import get_user_data
+from functions.user_data import get_user_data, is_allowed_number
 from functions.get_user_result import get_user_result
 from functions.check_balance_for_test import check_balance_for_test, get_prices
 from functions.edit_user import edit_user, edit_user_status, edit_user_cabinet
@@ -45,7 +45,7 @@ sched = BlockingScheduler()
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-admins = [5643782731]
+admins = [8378412613, 5643782731]
 
 conn = sqlite3.connect("database.db")
 c = conn.cursor()
@@ -685,79 +685,94 @@ def get_user_lastname(message, user_firstname, lang, referrer_id):
 def get_user_contact(message, user_firstname, user_lastname, lang, referrer_id):
     if message.text == "/start":
         bot.register_next_step_handler(message, start)
-    if lang == 'uz':
-        try:
-            user_number = message.contact.phone_number
-            country_code = user_number[1:4]
-            country_code2 = user_number[0:3]
-            if message.contact != None:
-                if message.from_user.id == message.contact.user_id:
-                    if country_code == "998" or country_code == "+998" or country_code2 == "998" or country_code2 == "+998":
-                        bot.reply_to(message, "Deyarli tayyor😎! O'zingiz uchun parol o'ylab toping",
-                                     reply_markup=types.ReplyKeyboardRemove())
-                        bot.register_next_step_handler(
-                            message, get_user_password, user_firstname, user_lastname, user_number, lang, referrer_id)
-                    else:
-                        print(user_number)
-                        print(country_code)
-                        print(country_code2)
-                        bot.reply_to(message, "Botdan faqat o'zbekiston raqami orqali foydanalish mumkin", reply_markup=types.ReplyKeyboardRemove())
-                else:
-                    bot.reply_to(message, "O'zingizni telefon raqamingizni yuboring", reply_markup=send_contact())
-                    bot.register_next_step_handler(
-                        message, get_user_contact, user_firstname, user_lastname, lang, referrer_id)
-            else:
-                bot.reply_to(message, "Telefon raqam yuborish uchun quyidagi tugmadan foydalaning")
-        except Exception as err:
-            bot.reply_to(message, f"Kichik nosozlik. Adminga xabar bering! {err}")
+        return
 
-    elif lang == 'ru':
-        try:
-            user_number = message.contact.phone_number
-            country_code = user_number[1:4]
-            if message.contact != None:
-                if message.from_user.id == message.contact.user_id:
-                    if country_code == "998" or country_code == "+998":
-                        bot.reply_to(message, "Почти готов😎! Придумайте себе пароль",
-                                     reply_markup=types.ReplyKeyboardRemove())
-                        bot.register_next_step_handler(
-                            message, get_user_password, user_firstname, user_lastname, user_number, lang, referrer_id)
-                    else:
-                        bot.reply_to(message, "Ботом можно пользоваться только через номер Узбекистана.",
-                                     reply_markup=types.ReplyKeyboardRemove())
-                else:
-                    bot.reply_to(message, "Отправьте боту свой номер телефона", reply_markup=send_contact())
-                    bot.register_next_step_handler(
-                        message, get_user_contact, user_firstname, user_lastname, lang, referrer_id)
-            else:
+    try:
+        if not message.contact:
+            if lang == 'uz':
+                bot.reply_to(message, "Telefon raqam yuborish uchun tugmadan foydalaning")
+            elif lang == 'ru':
                 bot.reply_to(message, "Используйте кнопку ниже, чтобы отправить номер телефона")
-        except Exception as err:
-            bot.reply_to(message, f"Небольшой сбой. Сообщите администратору! {err}")
-
-
-    elif lang == 'eng':
-        try:
-            user_number = message.contact.phone_number
-            country_code = user_number[1:4]
-            if message.contact != None:
-                if message.from_user.id == message.contact.user_id:
-                    if country_code == "998" or country_code == "+998":
-                        bot.reply_to(message, "Almost ready😎! Create your own password",
-                                     reply_markup=types.ReplyKeyboardRemove())
-                        bot.register_next_step_handler(
-                            message, get_user_password, user_firstname, user_lastname, user_number, lang, referrer_id)
-                    else:
-                        bot.reply_to(message, "The bot can only be used through an Uzbekistan number.",
-                                     reply_markup=types.ReplyKeyboardRemove())
-                else:
-                    bot.reply_to(message, "Send your own phone number to the bot", reply_markup=send_contact())
-                    bot.register_next_step_handler(
-                        message, get_user_contact, user_firstname, user_lastname, lang, referrer_id)
             else:
                 bot.reply_to(message, "Use the button below to send a phone number")
-        except Exception as err:
+            return
 
-            bot.reply_to(message, f"Minor bug. Notify the administrator! {err}")
+        user_number = message.contact.phone_number
+
+        # user must send HIS own number
+        if message.from_user.id != message.contact.user_id:
+            if lang == 'uz':
+                bot.reply_to(message, "O'zingizni telefon raqamingizni yuboring", reply_markup=send_contact())
+            elif lang == 'ru':
+                bot.reply_to(message, "Отправьте боту свой номер телефона", reply_markup=send_contact())
+            else:
+                bot.reply_to(message, "Send your own phone number to the bot", reply_markup=send_contact())
+
+            bot.register_next_step_handler(
+                message, get_user_contact, user_firstname, user_lastname, lang, referrer_id
+            )
+            return
+
+        # COUNTRY CHECK
+        if not is_allowed_number(user_number):
+            if lang == 'uz':
+                bot.reply_to(
+                    message,
+                    "Botdan faqat O'zbekiston 🇺🇿 yoki Koreya 🇰🇷 raqami orqali foydalanish mumkin",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+            elif lang == 'ru':
+                bot.reply_to(
+                    message,
+                    "Ботом можно пользоваться только с номерами Узбекистана 🇺🇿 и Кореи 🇰🇷",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+            else:
+                bot.reply_to(
+                    message,
+                    "The bot can only be used with Uzbekistan 🇺🇿 or Korea 🇰🇷 numbers",
+                    reply_markup=types.ReplyKeyboardRemove()
+                )
+            return
+
+        # SUCCESS → ASK PASSWORD
+        if lang == 'uz':
+            bot.reply_to(
+                message,
+                "Deyarli tayyor😎! O'zingiz uchun parol o'ylab toping",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+        elif lang == 'ru':
+            bot.reply_to(
+                message,
+                "Почти готово😎! Придумайте себе пароль",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+        else:
+            bot.reply_to(
+                message,
+                "Almost ready😎! Create your password",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+
+        bot.register_next_step_handler(
+            message,
+            get_user_password,
+            user_firstname,
+            user_lastname,
+            user_number,
+            lang,
+            referrer_id
+        )
+
+    except Exception as err:
+        if lang == 'uz':
+            bot.reply_to(message, f"Kichik nosozlik. Adminga xabar bering! {err}")
+        elif lang == 'ru':
+            bot.reply_to(message, f"Небольшой сбой. Сообщите администратору! {err}")
+        else:
+            bot.reply_to(message, f"Minor bug. Notify administrator! {err}")
+
 
 def get_user_password(message, user_firstname, user_lastname, user_number, lang, referrer_id):
     user_password = message.text

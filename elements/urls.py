@@ -1,5 +1,5 @@
-mysite = 'https://ed69-89-236-226-231.ngrok-free.app'
-api = 'https://ed69-89-236-226-231.ngrok-free.app'
+mysite = 'https://a897-182-227-130-12.ngrok-free.app/'
+api = 'https://a897-182-227-130-12.ngrok-free.app/'
 
 
 
